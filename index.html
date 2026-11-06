@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>설비 이상점 종합감지 대시보드</title>
+<style>
+:root{
+  --bg:#f4f5f8; --card:#fff; --ink:#1b2130; --muted:#667085; --line:#e3e6ee; --soft:#f0f2f7;
+  --accent:#2a63d6; --accent-soft:#e6eefc;
+  --bad:#c8372d; --bad-soft:#fbe9e7; --warn:#c77a00; --warn-soft:#fdf1dc; --ok:#1d8a57; --ok-soft:#e2f4ea;
+  --series:#2a63d6; --peer:#98a1b3; --band:rgba(42,99,214,.09);
+  --h0:#eef0f5; --h1:#fbe3b0; --h2:#f3a76b; --h3:#d9482f;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10131a; --card:#181c26; --ink:#e8ebf2; --muted:#9aa3b5; --line:#2a3040; --soft:#212737;
+    --accent:#6c9bff; --accent-soft:#1f2c4a;
+    --bad:#ff7a6e; --bad-soft:#3a1f1d; --warn:#f0b24a; --warn-soft:#3a2d14; --ok:#52c98a; --ok-soft:#173326;
+    --series:#6c9bff; --peer:#6b7488; --band:rgba(108,155,255,.12);
+    --h0:#232938; --h1:#5a4a22; --h2:#a8582e; --h3:#e5604a;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Pretendard","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;max-width:1700px;margin:0 auto;padding:16px}
+main{min-width:0;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+h1{font-size:20px;margin:0}
+h2{font-size:15px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:12px}
+.head{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;justify-content:space-between}
+.meta{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.tag.mock{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.summary{border-left:4px solid var(--accent)}
+.summary ol{margin:8px 0 0;padding-left:20px}
+.summary li{margin:4px 0}
+.summary b.r{color:var(--bad)}
+.alert{display:flex;gap:10px;align-items:flex-start;background:var(--warn-soft);color:var(--ink);border:1px solid var(--warn);border-radius:12px;padding:12px 16px}
+.alert strong{color:var(--warn)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.kpi .lab{font-size:12px;color:var(--muted)}
+.kpi .val{font-size:26px;font-weight:700;margin:2px 0;font-variant-numeric:tabular-nums}
+.kpi .row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.kpi .bar{height:6px;border-radius:3px;background:var(--soft);margin:8px 0 6px;position:relative;overflow:hidden}
+.kpi .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent)}
+.badge{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;font-weight:600}
+.b-ok{background:var(--ok-soft);color:var(--ok)} .b-bad{background:var(--bad-soft);color:var(--bad)} .b-warn{background:var(--warn-soft);color:var(--warn)} .b-gray{background:var(--soft);color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+select,button,input{font:inherit;color:var(--ink)}
+select,.seg button{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+.seg{display:inline-flex}
+.seg button{border-radius:0;margin-left:-1px;cursor:pointer}
+.seg button:first-child{border-radius:8px 0 0 8px;margin-left:0}.seg button:last-child{border-radius:0 8px 8px 0}
+.seg button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);position:relative;z-index:1}
+.chart{position:relative}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{fill:var(--muted);font-size:11px;font-family:inherit}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:6px 8px;border-radius:6px;white-space:nowrap;display:none;z-index:5}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-top:4px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.heat{display:grid;gap:2px;font-size:11px}
+.heat .c{height:20px;border-radius:3px;cursor:pointer;border:1px solid transparent}
+.heat .c:hover{border-color:var(--ink)}
+.heat .t{display:flex;align-items:center;color:var(--muted);padding-right:6px;white-space:nowrap}
+.heat .d{text-align:center;color:var(--muted);font-size:10px}
+.scale{display:flex;gap:10px;align-items:center;font-size:11px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+.scale i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;background:var(--soft)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--soft)} tbody tr.sel{background:var(--accent-soft)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.tw{overflow-x:auto}
+.cause{margin:10px 0}
+.cause .top{display:flex;justify-content:space-between;gap:8px}
+.cause .bar{height:8px;background:var(--soft);border-radius:4px;margin:4px 0}
+.cause .bar i{display:block;height:100%;border-radius:4px;background:var(--accent)}
+.cause .ev{font-size:12px;color:var(--muted)}
+.note{font-size:12px;background:var(--soft);border-radius:8px;padding:8px 10px;color:var(--muted);margin-top:8px}
+.tl{list-style:none;margin:8px 0 0;padding:0;font-size:12px}
+.tl li{padding:5px 0 5px 14px;border-left:2px solid var(--line);position:relative}
+.tl li:before{content:"";position:absolute;left:-5px;top:11px;width:8px;height:8px;border-radius:50%;background:var(--peer)}
+.tl li.i:before{background:var(--accent)} .tl li.s:before{background:var(--warn)} .tl li.e:before{background:var(--bad)}
+.act{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.act input{margin-top:3px;width:16px;height:16px;accent-color:var(--accent)}
+.act.done .tx{text-decoration:line-through;color:var(--muted)}
+.act .m{font-size:12px;color:var(--muted)}
+/* chat */
+.cfg{border-bottom:1px solid var(--line);padding:8px 16px;font-size:12px}
+.cfg summary{cursor:pointer;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.cfg label{display:block;margin-top:8px;color:var(--muted)}
+.cfg input[type=text],.cfg input[type=password]{width:100%;margin-top:3px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 8px;font-size:12px}
+.cfg .chk{display:flex;gap:6px;align-items:center}
+.cfg .btns{display:flex;gap:6px;margin-top:10px}
+.cfg .btns button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:12px}
+.cfg .btns button.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.cfg .hint{margin-top:8px;color:var(--muted);line-height:1.4}
+.mode{font-weight:600}.mode.on{color:var(--ok)}
+aside{position:sticky;top:16px;height:calc(100vh - 32px);display:flex;flex-direction:column;padding:0;overflow:hidden}
+.chat-h{padding:14px 16px;border-bottom:1px solid var(--line)}
+.msgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.m{max-width:92%;padding:8px 11px;border-radius:12px;font-size:13px;word-break:break-word}
+.m.u{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.m.b{align-self:flex-start;background:var(--soft);border-bottom-left-radius:4px}
+.m.b ul{margin:4px 0 0;padding-left:18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px;border-top:1px solid var(--line)}
+.chips button{font-size:12px;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:3px 10px;cursor:pointer}
+.chips button:hover{border-color:var(--accent);color:var(--accent)}
+.send{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
+.send input{flex:1;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 10px;min-width:0}
+.send button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:0 14px;cursor:pointer}
+@media (max-width:1100px){
+  .app{grid-template-columns:1fr}
+  aside{position:static;height:560px}
+  .grid2{grid-template-columns:1fr}
+}
+@media (max-width:560px){.app{padding:12px}}
+</style>
+</head>
+<body>
+<div class="app">
+<main>
+  <section class="card head">
+    <div>
+      <h1>분석설비 이상점 종합감지 대시보드</h1>
+      <div class="sub">오염분석 모니터링 · FAB 내 오염분석 결과 · AI PoC (작성자 김지연)</div>
+    </div>
+    <div class="meta">
+      <span class="tag">기간 2026-10-01 ~ 10-31</span>
+      <span class="tag">기준시각 10-31 23:00</span>
+      <span class="tag mock">임의 생성 데이터 (Mock)</span>
+    </div>
+  </section>
+
+  <section class="card summary">
+    <h2>요약 3줄</h2>
+    <ol id="summary"></ol>
+  </section>
+
+  <div id="alertBox"></div>
+
+  <section>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section class="card">
+    <h2>① 파라미터 추이 · 이상 구간 · 예측</h2>
+    <div class="sub">관리 한계 = 정상 구간(10/1~10/5) 평균 ± 3σ. 회색선 = 타 설비 평균(동일 파라미터). 점선 = 진행 중 설비의 24h 예측.</div>
+    <div class="toolbar">
+      <label>설비 <select id="selTool"></select></label>
+      <label>파라미터 <select id="selMetric"></select></label>
+      <span class="seg" id="rangeSeg"><button data-r="all" class="on">31일 전체</button><button data-r="ev">선택 이벤트 ±3일</button></span>
+    </div>
+    <div class="chart" id="chart"></div>
+    <div class="legend">
+      <span><i style="background:var(--series)"></i>선택 설비</span>
+      <span><i style="background:var(--peer)"></i>타 설비 평균</span>
+      <span><i style="background:var(--bad);opacity:.5;height:8px"></i>이상 구간</span>
+      <span><svg width="10" height="10" style="display:inline;vertical-align:middle"><path d="M5 0L10 5L5 10L0 5Z" fill="var(--accent)"/></svg> 설비점검</span>
+      <span><svg width="10" height="10" style="display:inline;vertical-align:middle"><circle cx="5" cy="5" r="4" fill="var(--warn)"/></svg> 고농도 시료 투입</span>
+    </div>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>② 설비 × 일자 이상 강도</h2>
+      <div class="sub">일별 최대 |EWMA z|. 셀 클릭 시 해당 설비 선택.</div>
+      <div id="heat" style="margin-top:10px"></div>
+    </section>
+    <section class="card">
+      <h2>③ 향후 24h 이상 발생 위험도 (예측)</h2>
+      <div class="sub">최근 12h 추세를 외삽한 가능성 지표. 50% 이상 시 선제 점검 권고.</div>
+      <div id="risk" style="margin-top:10px"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>④ 감지 시간: 기존 방식 vs PoC (이벤트별)</h2>
+    <div class="sub">기존 = 현업 정기 확인으로 인지한 시점, PoC = 대시보드 알림 시점(데이터로 산출). 이상 발생 시점 대비 경과 시간(h).</div>
+    <div id="cmp" style="margin-top:8px"></div>
+    <div class="legend"><span><i style="background:var(--peer)"></i>기존(수동)</span><span><i style="background:var(--accent)"></i>PoC(AI 알림)</span></div>
+  </section>
+
+  <section class="card">
+    <h2>⑤ 이상점 상세 표</h2>
+    <div class="sub">행을 클릭하면 위 차트와 아래 원인 후보, 우측 챗봇의 대상이 바뀝니다.</div>
+    <div class="tw"><table id="tbl"></table></div>
+  </section>
+
+  <section class="card" id="detail"></section>
+
+  <section class="card">
+    <h2>⑥ 권고 조치 · 확인란</h2>
+    <div class="sub">조치 완료 시 체크하세요. (브라우저에 저장됨)</div>
+    <div id="acts"></div>
+  </section>
+  <div class="sub" style="text-align:center;padding-bottom:8px">본 화면의 모든 수치는 PoC 시연용 임의 생성 데이터이며, 원인은 결론이 아닌 가능성(%)으로만 표시합니다. 최종 판단은 사용자가 합니다.</div>
+</main>
+
+<aside class="card">
+  <div class="chat-h"><h2>이력 조회 챗봇</h2><div class="sub">설비·이벤트·점검/시료 이력 질의 (LLM 연결 시 대시보드 데이터 기반 답변)</div></div>
+  <details class="cfg" id="cfg">
+    <summary><span>LLM 연결 설정</span><span class="mode" id="mode">규칙기반(시연) 모드</span></summary>
+    <label>base_url<input type="text" id="cfgUrl" placeholder="https://api.openai.com/v1" autocomplete="off" spellcheck="false"></label>
+    <label>api_key<input type="password" id="cfgKey" placeholder="sk-..." autocomplete="off"></label>
+    <label>model_name<input type="text" id="cfgModel" placeholder="예: gpt-4o-mini" autocomplete="off" spellcheck="false"></label>
+    <label class="chk"><input type="checkbox" id="cfgRem"> 이 탭이 열려 있는 동안 api_key 기억 (sessionStorage)</label>
+    <div class="btns"><button type="button" class="p" id="cfgSave">적용</button><button type="button" id="cfgClear">초기화</button></div>
+    <div class="hint">OpenAI 호환 <code>/chat/completions</code> API를 호출합니다. 키는 입력한 주소로만 전송되며 파일에는 저장되지 않습니다. 비워 두면 규칙기반 모드로 동작합니다. 브라우저에서 직접 호출하므로 해당 서버가 CORS를 허용해야 합니다.</div>
+  </details>
+  <div class="msgs" id="msgs"></div>
+  <div class="chips" id="chips"></div>
+  <form class="send" id="form"><input id="inp" placeholder="예: A-2 원인 후보 알려줘" autocomplete="off"><button>전송</button></form>
+</aside>
+</div>
+
+<script>
+/* ================= 데이터 생성 (임의 데이터) ================= */
+const H=744, NOW=743, BASE_H=120, TH=1.7, LAM=0.25;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd=mulberry32(20261031);
+function gauss(){let u=0;while(!u)u=rnd();const v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+const dh=(d,h)=>(d-1)*24+h;
+const pad=n=>String(n).padStart(2,'0');
+const fmt=h=>`10/${pad(Math.floor(h/24)+1)} ${pad(h%24)}:00`;
+
+const METRICS={
+  sens :{label:'감도 지수',unit:'%',base:100,sd:0.8},
+  bg   :{label:'바탕신호(BG)',unit:'cps',base:120,sd:6},
+  flow :{label:'공급 가스 유량',unit:'L/min',base:0.95,sd:0.004},
+  temp :{label:'냉각수 온도',unit:'°C',base:20,sd:0.12},
+  rsd  :{label:'반복정밀도 RSD',unit:'%',base:1.8,sd:0.12},
+  blank:{label:'블랭크 Fe',unit:'ppt',base:5,sd:0.5}
+};
+const MK=Object.keys(METRICS);
+const TOOLS=['A-1','A-2','A-3','A-4','A-5','A-6','A-7','A-8','A-9','A-10'];
+
+/* 이상 이벤트 (주입된 시나리오) */
+const EVENTS=[
+ {id:'E-01',tool:'A-6',metric:'bg',sev:'낮음',h0:dh(6,21),d:8,manual:13,anaAI:7,restBase:22,restAI:9,status:'종결',
+  fx:{bg:t=>25*Math.exp(-t/6),blank:t=>2.5*Math.exp(-t/6)},
+  causes:[['시약 교체 후 안정화 부족',46,'3h 전(10/06 18:00) 시약 교체 이력, 베이스라인 점진 하강'],['시약 조제 오염',24,'동일 시약 사용 타 설비(A-5) 영향 없음 → 연관성 낮음'],['분리부 오염',18,'최근 분리부 이력 변동 없음'],['기타',12,'']],
+  act:'시약 교체 후 30분 이상 안정화 확인 절차를 SOP에 추가'},
+ {id:'E-02',tool:'A-2',metric:'sens',sev:'높음',h0:dh(8,14),d:30,manual:19,anaAI:10,restBase:30,restAI:12,status:'종결',
+  fx:{sens:t=>-Math.min(13,0.45*t),flow:t=>-0.0006*t,rsd:t=>0.03*t,bg:t=>0.8*t},
+  causes:[['시료 도입부 오염·막힘',58,'감도↓·RSD↑·유량↓ 동반, 2h 전 고농도 매트릭스 시료(Etch 잔사) 투입'],['고농도 시료 매트릭스 영향',22,'직전 시료 Matrix=High (S-0814)'],['펌프 튜빙 마모',12,'유량 저하 패턴과 부분 일치'],['기타',8,'']],
+  act:'고농도 시료 투입 후 도입부 세정 주기 단축(주 1회 → 고농도 투입 시 즉시)'},
+ {id:'E-03',tool:'A-5',metric:'blank',sev:'중간',h0:dh(15,2),d:9,manual:14,anaAI:2,restBase:20,restAI:8,status:'종결',
+  fx:{blank:t=>38*Math.exp(-t/8),bg:t=>40*Math.exp(-t/8),rsd:t=>0.6*Math.exp(-t/6)},
+  causes:[['고농도 시료 Carry-over',52,'10/14 22:00 CMP 후세정 고농도 금속이온 시료(L2610-0417) 직후 블랭크 급등'],['시약 오염',24,'교체 이력 없음, 동일 시약 사용 A-6 정상'],['분리부 수명',14,'사용 누적 78%'],['기타',10,'']],
+  act:'고농도 시료 후 블랭크 2회 자동 삽입 규칙 적용'},
+ {id:'E-04',tool:'A-4',metric:'rsd',sev:'낮음',h0:dh(18,3),d:5,manual:12,anaAI:6,restBase:16,restAI:6,status:'종결',
+  fx:{rsd:t=>0.9*Math.exp(-t/3),flow:t=>0.015*Math.sin(t*2.1)},
+  causes:[['가스 공급 압력 변동(시설)',44,'유량 진동 동반, 동일 가스 라인 A-2/A-3는 정상'],['시료 이송 배관 기포',31,'RSD 일시 급등 후 자연 회복 패턴'],['기타',25,'']],
+  act:'가스 공급 압력 로그 상시 연동 및 레귤레이터 점검 주기 확인'},
+ {id:'E-05',tool:'A-8',metric:'temp',sev:'중간',h0:dh(21,8),d:20,manual:22,anaAI:9,restBase:26,restAI:11,status:'종결',
+  fx:{temp:t=>0.9*Math.min(1,t/6),sens:t=>-2*Math.min(1,t/6),rsd:t=>0.4*Math.min(1,t/6)},
+  causes:[['칠러(냉각수) 이상',58,'타 설비(A-7 등)와 다른 트렌드, 10/19 칠러 배관 점검 이력'],['클린룸 온도 변동',14,'동일 베이 설비 영향 없음'],['설비 내부 히터/센서',16,'온도 센서 교정 이력 확인 필요'],['기타',12,'']],
+  act:'칠러 필터 교체 및 냉각수 온도 알람 임계값 재설정'},
+ {id:'E-06',tool:'A-9',metric:'sens',sev:'높음',h0:dh(26,10),d:36,manual:16,anaAI:11,restBase:28,restAI:12,status:'종결',
+  fx:{sens:t=>-6,rsd:t=>0.5},
+  causes:[['PM 후 광학 정렬 변화',64,'10/25 17:00 PM(정렬 조정) 이후 Step 형태 감도 저하'],['광원 모듈 노화',18,'누적 사용시간 상위 구간'],['시료 스테이지 오염',10,''],['기타',8,'']],
+  act:'PM 후 표준시료 감도 확인(Pass 기준) 체크리스트 추가'},
+ {id:'E-07',tool:'A-3',metric:'rsd',sev:'예측',h0:dh(30,6),d:H-dh(30,6),manual:null,anaAI:8,restBase:null,restAI:null,status:'진행중(예측경보)',
+  fx:{rsd:t=>0.017*t,sens:t=>-0.09*t,flow:t=>-0.0002*t,blank:t=>0.05*t},
+  causes:[['펌프 튜빙 마모',41,'마지막 교체 9/12(49일 경과), 유량 완만 저하 + RSD 상승'],['도입부 부분 막힘',29,'감도 완만 저하, 10/05 교체 이후 26일'],['주요 소모품 오염',18,'10/16 교체 이후 15일'],['기타',12,'']],
+  act:'펌프 튜빙 사전 교체 및 도입부 점검(예측 근거: 24h 내 한계 초과 가능)'}
+];
+
+const INSP=[
+ ['A-1',dh(4,10),'PM','정기점검'],['A-10',dh(9,10),'PM','정기점검'],['A-10',dh(23,14),'점검','정기 교정'],
+ ['A-3',dh(5,9),'PM','정기점검(도입부 부품 교체)'],['A-3',dh(16,14),'점검','주요 소모품 교체'],
+ ['A-2',dh(2,10),'PM','정기점검(도입부 점검)'],['A-2',dh(9,19),'조치','도입부 세정 + 도입부 부품 교체 → 정상 원복'],
+ ['A-4',dh(11,10),'PM','정기점검'],['A-4',dh(17,15),'점검','가스 공급 압력 레귤레이터 점검'],
+ ['A-5',dh(3,10),'PM','정기점검'],['A-5',dh(15,11),'조치','라인 플러싱 + 시약 교체 → 정상 원복'],
+ ['A-6',dh(6,18),'점검','시약 교체'],['A-6',dh(13,10),'PM','정기점검'],
+ ['A-7',dh(7,10),'PM','정기점검'],['A-7',dh(21,14),'점검','정기 교정'],
+ ['A-8',dh(19,15),'점검','칠러 공용 배관 점검(시설)'],['A-8',dh(22,9),'조치','칠러 필터 교체 → 정상 원복'],
+ ['A-9',dh(25,17),'PM','광원/광학 정렬 조정'],['A-9',dh(27,22),'조치','광학 재정렬 → 정상 원복']
+].map(([tool,h,type,note])=>({tool,h,type,note}));
+
+const PREV=['CMP','Etch','Clean','Dep','Litho'];
+const SAMPLES=[];
+TOOLS.forEach(tool=>{for(let d=1;d<=31;d++)for(let k=0;k<3;k++){
+  const h=dh(d,Math.floor(rnd()*24));
+  SAMPLES.push({tool,h,id:`S-${pad(d)}${pad(SAMPLES.length%100)}`,prev:PREV[Math.floor(rnd()*PREV.length)],matrix:rnd()<0.08?'Mid':'Low'});}});
+[['A-2',dh(8,12),'S-0814','Etch','High','Etch 잔사 고농도 매트릭스'],
+ ['A-5',dh(14,22),'L2610-0417','CMP','High','CMP 후세정 고농도 금속이온'],
+ ['A-3',dh(29,20),'S-2991','Etch','Mid','중간 매트릭스']
+].forEach(([tool,h,id,prev,matrix,note])=>SAMPLES.push({tool,h,id,prev,matrix,note}));
+SAMPLES.sort((a,b)=>a.h-b.h);
+
+/* 시계열 */
+const DATA={};
+TOOLS.forEach(tool=>{DATA[tool]={};MK.forEach(m=>{
+  const M=METRICS[m],off=(rnd()-.5)*M.sd*1.2,a=new Float64Array(H);
+  for(let h=0;h<H;h++){a[h]=M.base+off+M.sd*gauss()+(m==='temp'?0.05*Math.sin(2*Math.PI*h/24):0)}
+  DATA[tool][m]=a;});});
+EVENTS.forEach(e=>{MK.forEach(m=>{if(!e.fx[m])return;for(let t=0;t<e.d;t++){const h=e.h0+t;if(h<H)DATA[e.tool][m][h]+=e.fx[m](t)}})});
+MK.forEach(m=>TOOLS.forEach(tool=>{const a=DATA[tool][m];for(let h=0;h<H;h++)if(a[h]<0.2)a[h]=0.2}));
+
+/* 통계/탐지 로직 */
+const STAT={},Z={},EZ={};
+TOOLS.forEach(tool=>{STAT[tool]={};Z[tool]={};EZ[tool]={};MK.forEach(m=>{
+  const a=DATA[tool][m];let s=0,q=0;for(let h=0;h<BASE_H;h++)s+=a[h];const mu=s/BASE_H;
+  for(let h=0;h<BASE_H;h++)q+=(a[h]-mu)**2;const sd=Math.sqrt(q/(BASE_H-1));
+  STAT[tool][m]={mu,sd};
+  const z=new Float64Array(H),ez=new Float64Array(H);let e=0;
+  for(let h=0;h<H;h++){z[h]=(a[h]-mu)/sd;e=LAM*z[h]+(1-LAM)*e;ez[h]=e}
+  Z[tool][m]=z;EZ[tool][m]=ez;});});
+const maxEz=(tool,h)=>{let x=0;MK.forEach(m=>{x=Math.max(x,Math.abs(EZ[tool][m][h]))});return x};
+
+function risk(tool,h){
+  if(h<12)return 0;let best=0;
+  MK.forEach(m=>{const z=Z[tool][m];let sx=0,sy=0,sxy=0,sxx=0;const n=12;
+    for(let i=0;i<n;i++){const y=z[h-n+1+i];sx+=i;sy+=y;sxy+=i*y;sxx+=i*i}
+    const slope=(n*sxy-sx*sy)/(n*sxx-sx*sx);
+    const zm=(z[h]+z[h-1]+z[h-2])/3;best=Math.max(best,Math.abs(zm+8*slope));});
+  return 100/(1+Math.exp(-(best-4.0)*1.2));
+}
+EVENTS.forEach(e=>{
+  const end=Math.min(H-1,e.h0+e.d-1);e.detH=null;
+  for(let h=e.h0;h<=end;h++){let hit=false;MK.forEach(m=>{if(e.fx[m]&&Math.abs(EZ[e.tool][m][h])>=TH)hit=true});if(hit){e.detH=h;break}}
+  e.detDelay=e.detH==null?null:e.detH-e.h0;
+  e.predH=null;for(let h=Math.max(12,e.h0-6);h<=Math.min(end,e.detH==null?end:e.detH);h++){if(risk(e.tool,h)>=50){e.predH=h;break}}
+  let pk=0;MK.forEach(m=>{if(e.fx[m])for(let h=e.h0;h<=end;h++)pk=Math.max(pk,Math.abs(Z[e.tool][m][h]))});e.peakZ=pk;
+});
+/* 오탐 (이벤트 구간+24h 제외) */
+let FALSE_ALARMS=0;
+TOOLS.forEach(tool=>{let on=false;for(let h=BASE_H;h<H;h++){
+  const inEv=EVENTS.some(e=>e.tool===tool&&h>=e.h0-2&&h<e.h0+e.d+24);
+  const hit=!inEv&&maxEz(tool,h)>=TH;if(hit&&!on)FALSE_ALARMS++;on=hit;}});
+const RISK_NOW={};TOOLS.forEach(t=>RISK_NOW[t]=risk(t,NOW));
+
+const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const DONE=EVENTS.filter(e=>e.status==='종결');
+const K={
+  detManual:avg(DONE.map(e=>e.manual)),
+  detAI:avg(DONE.map(e=>e.detDelay)),
+  anaManual:60,anaAI:avg(DONE.map(e=>e.anaAI)),
+  restBase:avg(DONE.map(e=>e.restBase)),restAI:avg(DONE.map(e=>e.restAI))
+};
+//==DOM==
+/* ================= 화면 ================= */
+const $=s=>document.querySelector(s);
+const sel={tool:'A-2',metric:'sens',ev:'E-02',range:'all'};
+const f1=x=>x.toFixed(1);
+const sevBadge=s=>({높음:'b-bad',중간:'b-warn',낮음:'b-gray',예측:'b-warn'}[s]||'b-gray');
+const evById=id=>EVENTS.find(e=>e.id===id);
+
+function renderSummary(){
+  const act=EVENTS.find(e=>e.status!=='종결'),top=RISK_NOW[act.tool];
+  $('#summary').innerHTML=
+   `<li><b>현황:</b> 10월 한 달간 설비 이상점 <b class="r">${DONE.length}건</b> 감지·종결, 현재 <b class="r">${act.tool}</b>에서 사전 징후(RSD↑·감도↓) 진행 중 — 향후 24h 이상 발생 가능성 <b class="r">${Math.round(top)}%</b>.</li>`+
+   `<li><b>원인:</b> 종결 이벤트는 고농도 시료 영향·소모품·시설(칠러/가스)·PM 후 정렬 변화가 주요 후보로 확인됨 (원인 확정이 아닌 가능성 %로 제시).</li>`+
+   `<li><b>성과:</b> 감지 소요 <b>${f1(K.detManual)}h → ${f1(K.detAI)}h</b>, 분석 소요 <b>60분 → ${Math.round(K.anaAI)}분</b>, 원복 <b>${Math.round(K.restBase)}h → ${Math.round(K.restAI)}h</b> (시뮬레이션, 오탐 ${FALSE_ALARMS}건).</li>`;
+  $('#alertBox').innerHTML=`<div class="alert"><span style="font-size:20px">⚠</span><div><strong>예측 경보 · ${act.tool}</strong><br>${fmt(act.h0)}부터 완만한 드리프트가 관측됩니다. 선제 점검 시 오류 데이터 송출을 줄일 수 있습니다. 상세는 <a href="#" id="goAct">E-07 보기</a></div></div>`;
+  $('#goAct').onclick=e=>{e.preventDefault();selectEvent('E-07');$('#detail').scrollIntoView({behavior:'smooth'})};
+}
+
+function kpiCard(lab,cur,tgt,poc,unit,achieved,pct){
+  return `<div class="card kpi"><div class="lab">${lab}</div>
+  <div class="val">${poc}<span style="font-size:14px;font-weight:400;color:var(--muted)"> ${unit}</span> <span class="badge ${achieved?'b-ok':'b-bad'}">${achieved?'목표 달성':'목표 미달'}</span></div>
+  <div class="bar"><i style="width:${Math.max(4,Math.min(100,pct))}%"></i></div>
+  <div class="row"><span>현재 ${cur}</span><span>목표 ${tgt}</span></div></div>`;
+}
+function renderKpis(){
+  const impDet=Math.max(0,Math.min(100,(1-K.detAI/K.detManual)*100));
+  $('#kpis').innerHTML=
+   kpiCard('설비 이상점 감지 소요시간','12~24h','1h 이내',f1(K.detAI),'h',K.detAI<=1,impDet)+
+   kpiCard('이상점 원인 분석 소요시간','60분','10분',Math.round(K.anaAI),'분',K.anaAI<=10,(1-K.anaAI/60)*100)+
+   kpiCard('이상점 발생 후 원복시간','24h','12h 이내',f1(K.restAI),'h',K.restAI<=12,(1-K.restAI/K.restBase)*100)+
+   `<div class="card kpi"><div class="lab">10월 이상점 / 예측경보</div><div class="val">${EVENTS.length}<span style="font-size:14px;font-weight:400;color:var(--muted)"> 건</span></div>
+    <div class="row" style="margin-top:12px"><span>종결 ${DONE.length}건 · 진행 ${EVENTS.length-DONE.length}건</span><span>오탐 ${FALSE_ALARMS}건</span></div></div>`;
+}
+
+/* 시계열 차트 */
+function renderChart(){
+  const tool=sel.tool,m=sel.metric,M=METRICS[m],a=DATA[tool][m],st=STAT[tool][m];
+  const ev=evById(sel.ev);let x0=0,x1=NOW;
+  if(sel.range==='ev'&&ev){x0=Math.max(0,ev.h0-72);x1=Math.min(NOW,ev.h0+Math.min(ev.d,96)+72)}
+  const active=EVENTS.find(e=>e.tool===tool&&e.status!=='종결');
+  const fcN=(active&&x1===NOW)?24:0;
+  const peers=[];for(let h=0;h<H;h++){let s=0,c=0;TOOLS.forEach(t=>{if(t!==tool){s+=DATA[t][m][h];c++}});peers.push(s/c)}
+  const up=st.mu+3*st.sd,lo=st.mu-3*st.sd;
+  let fc=null;
+  if(fcN){const n=12;let sx=0,sy=0,sxy=0,sxx=0;for(let i=0;i<n;i++){const y=a[NOW-n+1+i];sx+=i;sy+=y;sxy+=i*y;sxx+=i*i}
+    const sl=(n*sxy-sx*sy)/(n*sxx-sx*sx),b=(sy-sl*sx)/n;fc=k=>b+sl*(n-1+k)}
+  let mn=Infinity,mx=-Infinity;
+  for(let h=x0;h<=x1;h++){mn=Math.min(mn,a[h],peers[h]);mx=Math.max(mx,a[h],peers[h])}
+  mn=Math.min(mn,lo);mx=Math.max(mx,up);if(fc){mn=Math.min(mn,fc(fcN));mx=Math.max(mx,fc(fcN))}
+  const pd=(mx-mn)*0.06;mn-=pd;mx+=pd;
+  const W=900,Ht=320,L=52,R=16,T=12,B=34,xe=x1+fcN;
+  const X=h=>L+(h-x0)/(xe-x0)*(W-L-R),Y=v=>T+(1-(v-mn)/(mx-mn))*(Ht-T-B);
+  const path=(arr,s,e)=>{let d='';for(let h=s;h<=e;h++)d+=(h===s?'M':'L')+X(h).toFixed(1)+' '+Y(arr[h]).toFixed(1);return d};
+  let s=`<svg viewBox="0 0 ${W} ${Ht}" id="svgc">`;
+  for(let i=0;i<=4;i++){const v=mn+(mx-mn)*i/4,y=Y(v);s+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-6}" y="${y+4}" text-anchor="end">${v>=100?v.toFixed(0):v>=10?v.toFixed(1):v.toFixed(3)}</text>`}
+  const step=sel.range==='all'?24*3:24;
+  for(let h=Math.ceil(x0/step)*step;h<=x1;h+=step){s+=`<text x="${X(h)}" y="${Ht-14}" text-anchor="middle">10/${pad(Math.floor(h/24)+1)}</text>`}
+  s+=`<rect x="${L}" y="${Y(up)}" width="${W-L-R}" height="${Y(lo)-Y(up)}" fill="var(--band)"/>`;
+  s+=`<line x1="${L}" x2="${W-R}" y1="${Y(up)}" y2="${Y(up)}" stroke="var(--bad)" stroke-dasharray="4 3" opacity=".6"/><line x1="${L}" x2="${W-R}" y1="${Y(lo)}" y2="${Y(lo)}" stroke="var(--bad)" stroke-dasharray="4 3" opacity=".6"/>`;
+  EVENTS.filter(e=>e.tool===tool).forEach(e=>{
+    const a0=Math.max(x0,e.h0),a1=Math.min(x1,e.h0+e.d);if(a1<=a0)return;
+    s+=`<rect x="${X(a0)}" y="${T}" width="${Math.max(2,X(a1)-X(a0))}" height="${Ht-T-B}" fill="var(--bad)" opacity="${e.id===sel.ev?.18:.08}"/><text x="${X(a0)+3}" y="${T+11}" style="fill:var(--bad)">${e.id}</text>`;
+    if(e.detH!=null&&e.detH>=x0&&e.detH<=x1)s+=`<line x1="${X(e.detH)}" x2="${X(e.detH)}" y1="${T}" y2="${Ht-B}" stroke="var(--bad)" stroke-width="1.5"/>`});
+  s+=`<path d="${path(peers,x0,x1)}" fill="none" stroke="var(--peer)" stroke-width="1"/>`;
+  s+=`<path d="${path(a,x0,x1)}" fill="none" stroke="var(--series)" stroke-width="1.6" stroke-linejoin="round"/>`;
+  if(fc){let d=`M${X(NOW)} ${Y(a[NOW])}`;for(let k=1;k<=fcN;k++)d+=`L${X(NOW+k)} ${Y(fc(k))}`;
+    s+=`<path d="${d}" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 4"/><text x="${X(NOW+fcN)}" y="${T+11}" text-anchor="end" style="fill:var(--warn)">예측 +24h</text>`}
+  INSP.filter(i=>i.tool===tool&&i.h>=x0&&i.h<=x1).forEach(i=>{const cx=X(i.h),cy=Ht-B-6;
+    s+=`<path d="M${cx} ${cy-6}L${cx+6} ${cy}L${cx} ${cy+6}L${cx-6} ${cy}Z" fill="var(--accent)"><title>${fmt(i.h)} ${i.type}: ${i.note}</title></path>`});
+  SAMPLES.filter(p=>p.tool===tool&&p.matrix==='High'&&p.h>=x0&&p.h<=x1).forEach(p=>{
+    s+=`<circle cx="${X(p.h)}" cy="${Ht-B-20}" r="5" fill="var(--warn)"><title>${fmt(p.h)} 고농도 시료 ${p.id} (이전공정 ${p.prev})</title></circle>`});
+  s+=`<line id="cx" y1="${T}" y2="${Ht-B}" stroke="var(--ink)" opacity="0" /><rect id="hit" x="${L}" y="${T}" width="${W-L-R}" height="${Ht-T-B}" fill="transparent"/></svg><div class="tip" id="tip"></div>`;
+  $('#chart').innerHTML=s;
+  const svg=$('#svgc'),hit=$('#hit'),tip=$('#tip'),cx=$('#cx');
+  hit.addEventListener('mousemove',ev2=>{
+    const r=svg.getBoundingClientRect(),px=(ev2.clientX-r.left)/r.width*W;
+    const h=Math.max(x0,Math.min(x1,Math.round(x0+(px-L)/(W-L-R)*(xe-x0))));
+    cx.setAttribute('x1',X(h));cx.setAttribute('x2',X(h));cx.setAttribute('opacity',.4);
+    tip.style.display='block';tip.style.left=Math.min(r.width-200,(X(h)/W*r.width)+10)+'px';tip.style.top='8px';
+    tip.innerHTML=`${fmt(h)}<br>${tool}: <b>${a[h].toFixed(m==='flow'?3:2)}</b> ${M.unit} (z ${Z[tool][m][h].toFixed(1)})<br>타 설비 평균: ${peers[h].toFixed(m==='flow'?3:2)}`});
+  hit.addEventListener('mouseleave',()=>{tip.style.display='none';cx.setAttribute('opacity',0)});
+}
+
+function renderHeat(){
+  const cols=31;let s=`<div class="heat" style="grid-template-columns:78px repeat(${cols},minmax(0,1fr))"><div></div>`;
+  for(let d=1;d<=cols;d++)s+=`<div class="d">${d%5===1?d:''}</div>`;
+  TOOLS.forEach(t=>{s+=`<div class="t">${t}</div>`;
+    for(let d=0;d<cols;d++){let x=0;for(let h=d*24;h<d*24+24;h++)x=Math.max(x,maxEz(t,h));
+      const lv=x<TH?0:x<3?1:x<6?2:3;
+      s+=`<div class="c" data-t="${t}" data-d="${d}" style="background:var(--h${lv});${t===sel.tool?'outline:1px solid var(--line)':''}" title="${t} 10/${d+1} · 최대 |z| ${x.toFixed(1)}"></div>`}});
+  s+=`</div><div class="scale"><span><i style="background:var(--h0)"></i>정상</span><span><i style="background:var(--h1)"></i>주의</span><span><i style="background:var(--h2)"></i>경고</span><span><i style="background:var(--h3)"></i>이상</span></div>`;
+  $('#heat').innerHTML=s;
+  document.querySelectorAll('#heat .c').forEach(c=>c.onclick=()=>{
+    const t=c.dataset.t,d=+c.dataset.d;
+    const e=EVENTS.find(e=>e.tool===t&&e.h0<d*24+24&&e.h0+e.d>d*24);
+    if(e)selectEvent(e.id);else{sel.tool=t;syncControls();renderAll()}});
+}
+
+function renderRisk(){
+  const rows=TOOLS.map(t=>[t,RISK_NOW[t]]).sort((a,b)=>b[1]-a[1]);
+  let s='';
+  rows.forEach(([t,r])=>{const col=r>=50?'var(--bad)':r>=20?'var(--warn)':'var(--ok)';
+    s+=`<div style="display:flex;align-items:center;gap:8px;margin:7px 0;cursor:pointer" data-t="${t}"><div style="width:84px;font-size:12px">${t}</div>
+    <div style="flex:1;height:14px;background:var(--soft);border-radius:4px;position:relative"><div style="width:${Math.max(1,r)}%;height:100%;background:${col};border-radius:4px"></div><div style="position:absolute;left:50%;top:-2px;bottom:-2px;border-left:1px dashed var(--muted)"></div></div>
+    <div style="width:42px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px">${Math.round(r)}%</div></div>`});
+  $('#risk').innerHTML=s;
+  document.querySelectorAll('#risk [data-t]').forEach(d=>d.onclick=()=>{sel.tool=d.dataset.t;syncControls();renderAll()});
+}
+
+function renderCmp(){
+  const rows=DONE;const W=900,rh=34,Ht=rows.length*rh+30,L=150,R=40;const mx=26;
+  const X=v=>L+v/mx*(W-L-R);let s=`<svg viewBox="0 0 ${W} ${Ht}">`;
+  for(let v=0;v<=mx;v+=6)s+=`<line x1="${X(v)}" x2="${X(v)}" y1="0" y2="${Ht-20}" stroke="var(--line)"/><text x="${X(v)}" y="${Ht-4}" text-anchor="middle">${v}h</text>`;
+  rows.forEach((e,i)=>{const y=i*rh+4;
+    s+=`<text x="${L-8}" y="${y+17}" text-anchor="end">${e.id} ${e.tool}</text>
+    <rect x="${L}" y="${y}" width="${X(e.manual)-L}" height="12" rx="3" fill="var(--peer)"/><text x="${X(e.manual)+5}" y="${y+10}">${e.manual}h</text>
+    <rect x="${L}" y="${y+14}" width="${Math.max(2,X(e.detDelay)-L)}" height="12" rx="3" fill="var(--accent)"/><text x="${X(e.detDelay)+5}" y="${y+24}">${e.detDelay}h</text>`});
+  $('#cmp').innerHTML=s+'</svg>';
+}
+
+function renderTable(){
+  let s=`<thead><tr><th>ID</th><th>설비</th><th>주요 파라미터</th><th>발생 시점</th><th class="num">기존 감지(h)</th><th class="num">PoC 감지(h)</th><th>예측경보</th><th class="num">최대 |z|</th><th>1순위 원인 후보 (가능성)</th><th>등급</th><th>상태</th></tr></thead><tbody>`;
+  EVENTS.forEach(e=>{const c=e.causes[0];
+    s+=`<tr data-id="${e.id}" class="${e.id===sel.ev?'sel':''}"><td>${e.id}</td><td>${e.tool}</td><td>${METRICS[e.metric].label}</td><td>${fmt(e.h0)}</td>
+    <td class="num">${e.manual??'—'}</td><td class="num">${e.detDelay??'—'}</td><td>${e.predH!=null?'발생 '+(e.predH-e.h0>=0?'+':'')+(e.predH-e.h0)+'h':'—'}</td><td class="num">${e.peakZ.toFixed(1)}</td>
+    <td>${c[0]} <b>${c[1]}%</b></td><td><span class="badge ${sevBadge(e.sev)}">${e.sev}</span></td><td><span class="badge ${e.status==='종결'?'b-ok':'b-warn'}">${e.status}</span></td></tr>`});
+  $('#tbl').innerHTML=s+'</tbody>';
+  document.querySelectorAll('#tbl tbody tr').forEach(r=>r.onclick=()=>selectEvent(r.dataset.id));
+}
+
+function renderDetail(){
+  const e=evById(sel.ev);
+  const ins=INSP.filter(i=>i.tool===e.tool&&i.h>=e.h0-96&&i.h<=e.h0+e.d+24).map(i=>({h:i.h,c:'i',t:`<b>설비점검(${i.type})</b> ${i.note}`}));
+  const sm=SAMPLES.filter(p=>p.tool===e.tool&&p.h>=e.h0-24&&p.h<=Math.min(H,e.h0+e.d)&&p.matrix!=='Low').map(p=>({h:p.h,c:'s',t:`<b>시료 ${p.id}</b> 이전공정 ${p.prev}, 매트릭스 ${p.matrix}${p.note?' — '+p.note:''}`}));
+  const items=[...ins,...sm,{h:e.h0,c:'e',t:`<b>이상 발생</b> ${METRICS[e.metric].label} 이탈 시작`},...(e.detH!=null?[{h:e.detH,c:'e',t:`<b>PoC 알림</b> 발생 후 ${e.detDelay}h`}]:[])].sort((a,b)=>a.h-b.h);
+  $('#detail').innerHTML=`<h2>원인 후보 분석 · ${e.id} ${e.tool} <span class="badge ${sevBadge(e.sev)}">${e.sev}</span></h2>
+  <div class="sub">${e.status==='종결'?'종결 이벤트':'진행 중 — 예측 경보'} · 분석 소요 PoC ${e.anaAI}분 (기존 60분)</div>
+  <div class="grid2" style="margin-top:8px"><div>
+    ${e.causes.map(c=>`<div class="cause"><div class="top"><span>${c[0]}</span><b>${c[1]}%</b></div><div class="bar"><i style="width:${c[1]}%"></i></div>${c[2]?`<div class="ev">근거: ${c[2]}</div>`:''}</div>`).join('')}
+    <div class="note">※ 원인에 대한 결론이 아닌, 설비 Parameter·점검 이력·투입 시료 이력의 연관성 기반 <b>가능성(%)</b>입니다. 최종 판단은 담당자가 합니다.</div>
+  </div><div><div class="sub">관련 이력 타임라인 (점검 · 시료 · 감지)</div><ul class="tl">${items.map(i=>`<li class="${i.c}"><span class="sub">${fmt(i.h)}</span><br>${i.t}</li>`).join('')}</ul></div></div>`;
+}
+
+const ACTIONS=EVENTS.map(e=>({id:e.id,tool:e.tool,text:e.act,own:e.status==='종결'?'설비 담당':'설비 담당 · 우선',pri:e.status==='종결'?(e.sev==='높음'?'높음':'보통'):'긴급'}))
+  .sort((a,b)=>(b.pri==='긴급')-(a.pri==='긴급'));
+let CHK={};try{CHK=JSON.parse(localStorage.getItem('chk')||'{}')}catch(_){}
+function renderActs(){
+  $('#acts').innerHTML=ACTIONS.map(a=>`<label class="act ${CHK[a.id]?'done':''}"><input type="checkbox" data-id="${a.id}" ${CHK[a.id]?'checked':''}>
+  <div><div class="tx"><span class="badge ${a.pri==='긴급'?'b-bad':a.pri==='높음'?'b-warn':'b-gray'}">${a.pri}</span> [${a.id} ${a.tool}] ${a.text}</div><div class="m">${a.own}</div></div></label>`).join('');
+  document.querySelectorAll('#acts input').forEach(i=>i.onchange=()=>{CHK[i.dataset.id]=i.checked;try{localStorage.setItem('chk',JSON.stringify(CHK))}catch(_){}renderActs()});
+}
+
+function syncControls(){$('#selTool').value=sel.tool;$('#selMetric').value=sel.metric;
+  document.querySelectorAll('#rangeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.r===sel.range))}
+function selectEvent(id){const e=evById(id);sel.ev=id;sel.tool=e.tool;sel.metric=e.metric;syncControls();renderAll()}
+function renderAll(){renderChart();renderHeat();renderTable();renderDetail()}
+
+$('#selTool').innerHTML=TOOLS.map(t=>`<option>${t}</option>`).join('');
+$('#selMetric').innerHTML=MK.map(m=>`<option value="${m}">${METRICS[m].label} (${METRICS[m].unit})</option>`).join('');
+$('#selTool').onchange=e=>{sel.tool=e.target.value;const ev=EVENTS.find(x=>x.tool===sel.tool);if(ev)sel.ev=ev.id;renderAll()};
+$('#selMetric').onchange=e=>{sel.metric=e.target.value;renderChart()};
+document.querySelectorAll('#rangeSeg button').forEach(b=>b.onclick=()=>{sel.range=b.dataset.r;syncControls();renderChart()});
+
+/* ================= 챗봇 (규칙기반 시연) ================= */
+const msgs=$('#msgs');
+function addMsg(html,who){const d=document.createElement('div');d.className='m '+who;d.innerHTML=html;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm=s=>s.toLowerCase().replace(/[^a-z0-9가-힣]/g,'');
+function findTool(q){const n=norm(q);return [...TOOLS].sort((a,b)=>b.length-a.length).find(t=>n.includes(norm(t)))}
+function findEv(q){const n=norm(q);return EVENTS.find(e=>n.includes(norm(e.id)))}
+function causeHtml(e){return `<b>${e.id} · ${e.tool}</b> (${fmt(e.h0)} 발생, ${METRICS[e.metric].label})<br>원인 후보별 <b>가능성</b>이며 결론은 아닙니다.<ul>${e.causes.map(c=>`<li>${c[0]} <b>${c[1]}%</b>${c[2]?'<br><span class="sub">'+c[2]+'</span>':''}</li>`).join('')}</ul>`}
+function answer(q){
+  const t=findTool(q),ev=findEv(q)||(t?[...EVENTS].reverse().find(e=>e.tool===t):null);
+  const tool=t||(ev&&ev.tool)||sel.tool;
+  if(/점검|pm|교체|정비/i.test(q)){const l=INSP.filter(i=>i.tool===tool);return `<b>${tool} 설비점검 이력</b><ul>${l.map(i=>`<li>${fmt(i.h)} [${i.type}] ${i.note}</li>`).join('')}</ul>`}
+  if(/시료|lot|투입|이전\s*공정/i.test(q)){const l=SAMPLES.filter(p=>p.tool===tool&&p.matrix!=='Low');return `<b>${tool} 주의 시료 투입 이력</b> (Mid/High 매트릭스)<ul>${l.slice(-8).map(p=>`<li>${fmt(p.h)} ${p.id} · 이전공정 ${p.prev} · ${p.matrix}${p.note?' ('+p.note+')':''}</li>`).join('')}</ul>`}
+  if(/원인|이유|왜|후보/.test(q)){const e=ev||evById(sel.ev);return causeHtml(e)}
+  if(/예측|예정|위험|앞으로|발생할/.test(q)){
+    if(t)return `<b>${t}</b> 향후 24h 이상 발생 가능성: <b>${Math.round(RISK_NOW[t])}%</b> ${RISK_NOW[t]>=50?'— 선제 점검을 권고합니다.':'— 현재 정상 범위입니다.'}`;
+    const r=TOOLS.map(x=>[x,RISK_NOW[x]]).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    return `<b>예측 위험도 상위 설비</b><ul>${r.map(([x,v])=>`<li>${x} <b>${Math.round(v)}%</b></li>`).join('')}</ul>`}
+  if(/kpi|성과|시간|소요|효과|원복/i.test(q))return `<b>PoC KPI (시뮬레이션)</b><ul><li>감지: ${f1(K.detManual)}h → <b>${f1(K.detAI)}h</b> (목표 1h)</li><li>원인 분석: 60분 → <b>${Math.round(K.anaAI)}분</b> (목표 10분)</li><li>원복: ${Math.round(K.restBase)}h → <b>${Math.round(K.restAI)}h</b> (목표 12h)</li></ul>`;
+  if(ev&&(findEv(q)||t)&&/이상|이벤트|상태|현황|알려|보여/.test(q)){selectEvent(ev.id);return causeHtml(ev)}
+  if(/요약|현황|전체|이상점|이벤트/.test(q))return `<b>10월 이상점 ${EVENTS.length}건</b><ul>${EVENTS.map(e=>`<li>${e.id} ${e.tool} · ${METRICS[e.metric].label} · ${fmt(e.h0)} · ${e.status}</li>`).join('')}</ul>`;
+  if(t)return `<b>${t}</b> 현재 위험도 ${Math.round(RISK_NOW[t])}%. 이벤트: ${EVENTS.filter(e=>e.tool===t).map(e=>e.id).join(', ')||'없음'}.<br><span class="sub">“원인”, “점검 이력”, “시료 이력”, “예측”을 함께 물어보세요.</span>`;
+  return `질문을 이해하지 못했어요. 설비명(예: A-2)이나 이벤트(E-02)와 함께 <b>원인 · 점검 이력 · 시료 이력 · 예측 · KPI</b>를 물어보세요.`;
+}
+/* ---- LLM 설정 ---- */
+const LS=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k)||'';v===null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(_){return ''}};
+const SS=(k,v)=>{try{if(v===undefined)return sessionStorage.getItem(k)||'';v===null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v)}catch(_){return ''}};
+const CFG={url:LS('llm_url'),key:SS('llm_key'),model:LS('llm_model')};
+const HIST=[];
+function refreshMode(){const on=CFG.url&&CFG.model;const m=$('#mode');m.textContent=on?`LLM: ${CFG.model}`:'규칙기반(시연) 모드';m.classList.toggle('on',!!on)}
+$('#cfgUrl').value=CFG.url;$('#cfgKey').value=CFG.key;$('#cfgModel').value=CFG.model;$('#cfgRem').checked=!!CFG.key;refreshMode();
+$('#cfgSave').onclick=()=>{
+  CFG.url=$('#cfgUrl').value.trim();CFG.key=$('#cfgKey').value.trim();CFG.model=$('#cfgModel').value.trim();
+  LS('llm_url',CFG.url||null);LS('llm_model',CFG.model||null);
+  if($('#cfgRem').checked&&CFG.key)SS('llm_key',CFG.key);else SS('llm_key',null);
+  refreshMode();HIST.length=0;
+  const on=CFG.url&&CFG.model;
+  addMsg(on?`LLM 설정을 적용했습니다. (<b>${esc(CFG.model)}</b>) 이제 질문은 대시보드 데이터와 함께 LLM으로 전송됩니다.`:'base_url / model_name이 비어 있어 규칙기반 모드로 동작합니다.','b');
+  if(on)$('#cfg').open=false};
+$('#cfgClear').onclick=()=>{CFG.url=CFG.key=CFG.model='';['cfgUrl','cfgKey','cfgModel'].forEach(i=>$('#'+i).value='');$('#cfgRem').checked=false;
+  LS('llm_url',null);LS('llm_model',null);SS('llm_key',null);HIST.length=0;refreshMode();addMsg('LLM 설정을 초기화했습니다. 규칙기반 모드로 동작합니다.','b')};
+
+/* ---- LLM 호출 (OpenAI 호환 /chat/completions) ---- */
+function buildContext(){
+  const ev=EVENTS.map(e=>({id:e.id,설비:e.tool,파라미터:METRICS[e.metric].label,발생:fmt(e.h0),상태:e.status,등급:e.sev,기존감지h:e.manual,PoC감지h:e.detDelay,원인후보:e.causes.map(c=>({후보:c[0],가능성:c[1]+'%',근거:c[2]}))}));
+  const ins=INSP.map(i=>`${i.tool} ${fmt(i.h)} [${i.type}] ${i.note}`);
+  const sm=SAMPLES.filter(p=>p.matrix!=='Low').map(p=>`${p.tool} ${fmt(p.h)} ${p.id} 이전공정=${p.prev} 매트릭스=${p.matrix}${p.note?' '+p.note:''}`);
+  const rk=TOOLS.map(t=>`${t}:${Math.round(RISK_NOW[t])}%`).join(', ');
+  return `[기준시각 10-31 23:00, 기간 10/01~10/31, 설비 ${TOOLS.join(', ')}]\n[이상 이벤트]\n${JSON.stringify(ev)}\n[설비점검 이력]\n${ins.join('\n')}\n[주의 시료 투입 이력(Mid/High)]\n${sm.join('\n')}\n[향후 24h 이상 발생 위험도]\n${rk}\n[KPI 시뮬레이션] 감지 ${f1(K.detManual)}h→${f1(K.detAI)}h, 분석 60분→${Math.round(K.anaAI)}분, 원복 ${Math.round(K.restBase)}h→${Math.round(K.restAI)}h, 오탐 ${FALSE_ALARMS}건`;
+}
+const SYSTEM_PROMPT=`당신은 반도체 FAB 오염분석 설비 이상점 종합감지 대시보드의 이력 조회 어시스턴트입니다.
+- 아래 대시보드 데이터만 근거로 한국어로 간결하게 답하세요. 데이터에 없는 내용은 없다고 말하세요.
+- 이상점 원인에 대해 결론을 내리지 말고, 원인 후보별 발생 가능성(%)과 근거 이력으로만 제시하세요. 최종 판단은 사용자가 합니다.
+- 설비는 A-1~A-10으로만 지칭하고, 설비 종류나 모델을 추측하지 마세요.
+- 짧은 문단과 글머리표를 사용하세요.
+
+`;
+function fmtLLM(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>')}
+async function askLLM(q){
+  let url=CFG.url.replace(/\/+$/,'');if(!/\/chat\/completions$/.test(url))url+='/chat/completions';
+  const messages=[{role:'system',content:SYSTEM_PROMPT+buildContext()},...HIST.slice(-10),{role:'user',content:q}];
+  const headers={'Content-Type':'application/json'};if(CFG.key)headers.Authorization='Bearer '+CFG.key;
+  const r=await fetch(url,{method:'POST',headers,body:JSON.stringify({model:CFG.model,messages})});
+  if(!r.ok){let d='';try{d=(await r.text()).slice(0,300)}catch(_){}throw new Error(`HTTP ${r.status} ${d}`)}
+  const j=await r.json();const c=j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
+  if(!c)throw new Error('응답 형식이 올바르지 않습니다 (choices[0].message.content 없음)');
+  HIST.push({role:'user',content:q},{role:'assistant',content:c});return c;
+}
+async function ask(q){
+  if(!q.trim())return;addMsg(esc(q),'u');
+  if(!(CFG.url&&CFG.model)){setTimeout(()=>addMsg(answer(q),'b'),350);return}
+  addMsg('<span class="sub">LLM 응답 대기 중…</span>','b');const ph=msgs.lastChild;
+  try{ph.innerHTML=fmtLLM(await askLLM(q))}
+  catch(err){ph.innerHTML=`LLM 호출에 실패했습니다.<br><span class="sub">${esc(String(err.message||err))}</span><br><span class="sub">base_url·api_key·model_name과 CORS 허용 여부를 확인하세요. 아래는 규칙기반 답변입니다.</span><hr style="border:0;border-top:1px solid var(--line)">${answer(q)}`}
+  msgs.scrollTop=msgs.scrollHeight}
+$('#form').onsubmit=e=>{e.preventDefault();const i=$('#inp');ask(i.value);i.value=''};
+['A-2 원인 후보 알려줘','A-3 예측 상태는?','A-5 시료 이력','A-8 점검 이력','KPI 성과 요약'].forEach(q=>{const b=document.createElement('button');b.textContent=q;b.type='button';b.onclick=()=>ask(q);$('#chips').appendChild(b)});
+addMsg('안녕하세요. 분석설비 이상점 이력 조회 챗봇입니다. 원인은 <b>결론이 아닌 가능성(%)</b>으로만 안내합니다. 아래 예시 질문을 눌러보세요.','b');
+
+renderSummary();renderKpis();renderRisk();renderCmp();renderActs();syncControls();renderAll();
+</script>
+</body>
+</html>
